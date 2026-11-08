@@ -1,0 +1,134 @@
+import json
+import os
+import threading
+import time
+import feedparser
+import requests
+from flask import Flask
+
+# الإعدادات الخاصة بك جاهزة تماماً
+TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
+TELEGRAM_CHAT_ID = "-1003976750898"
+GROQ_API_KEY = "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"
+
+# روابط RSS لمواقع رياضية موثوقة (يمكنك إضافة أو تعديل الروابط لاحقاً)
+RSS_FEEDS = [
+    "https://www.filgoal.com/news/rss",  # موقع في الجول
+]
+
+SENT_FILE = "sent_links.json"
+
+# سيرفر وهمي بسيط لإبقاء الاستضافة المجانية تعمل على مدار الساعة بدون توقف
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+  return "Football News Bot is running 24/7 successfully!"
+
+
+def run_flask():
+  app.run(host="0.0.0.0", port=10000)
+
+
+def load_sent_links():
+  if os.path.exists(SENT_FILE):
+    try:
+      with open(SENT_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except:
+      return []
+  return []
+
+
+def save_sent_link(link):
+  sent = load_sent_links()
+  if link not in sent:
+    sent.append(link)
+    if len(sent) > 500:
+      sent = sent[-500:]  # الاحتفاظ بآخر 500 رابط فقط لتخفيف الملف
+    with open(SENT_FILE, "w", encoding="utf-8") as f:
+      json.dump(sent, f, ensure_ascii=False)
+
+
+def rewrite_with_groq(text):
+  url = "https://api.groq.com/openai/v1/chat/completions"
+  headers = {
+      "Authorization": f"Bearer {GROQ_API_KEY}",
+      "Content-Type": "application/json",
+  }
+
+  prompt = (
+      "قم بإعادة صياغة وتلخيص هذا الخبر الرياضي باللغة العربية الفصحى المبسطة"
+      " والاحترافية. احرص على أن يكون الخبر كاملاً شاملاً لكل التفاصيل والوقائع"
+      " الأساسية دون حذف أو قطع للمعلومات المهمة، واجعله جذاباً للقارئ:\n\n"
+      f"{text}"
+  )
+
+  payload = {
+      "model": "llama-3.3-70b-versatile",
+      "messages": [{"role": "user", "content": prompt}],
+      "temperature": 0.7,
+  }
+
+  try:
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+    if response.status_code == 200:
+      res_json = response.json()
+      return res_json["choices"][0]["message"]["content"].strip()
+  except Exception as e:
+    print(f"Error with Groq API: {e}")
+  return text
+
+
+def send_to_telegram(message):
+  url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+  payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+  try:
+    requests.post(url, json=payload)
+  except Exception as e:
+    print(f"Telegram error: {e}")
+
+
+def news_bot_loop():
+  print("News bot worker started...")
+  while True:
+    sent_links = load_sent_links()
+    for feed_url in RSS_FEEDS:
+      try:
+        feed = feedparser.parse(feed_url)
+        source_name = feed.feed.get("title", "أخبار كرة القدم")
+
+        for entry in feed.entries[:5]:
+          link = entry.link
+          if link in sent_links:
+            continue
+
+          title = entry.get("title", "")
+          summary = entry.get("summary", entry.get("description", ""))
+          full_text = f"العنوان: {title}\nالتفاصيل: {summary}"
+
+          print(f"Processing: {title}")
+          rewritten_text = rewrite_with_groq(full_text)
+
+          # رسالة الخبر مع اسم المصدر بدون روابط كما طلبت
+          message = (
+              f"⚽ <b>{rewritten_text}</b>\n\n📌 <b>المصدر:</b> {source_name}"
+          )
+
+          send_to_telegram(message)
+          save_sent_link(link)
+          time.sleep(10)  # فاصل زمني بين كل خبر لتجنب الحظر
+      except Exception as e:
+        print(f"Feed error: {e}")
+
+    print("Waiting 10 minutes for next check...")
+    time.sleep(600)  # فحص الأخبار الجديدة كل 10 دقائق
+
+
+if __name__ == "__main__":
+  # تشغيل سيرفر الويب في خلفية الكود لضمان استمرار الاستضافة المجانية
+  t = threading.Thread(target=run_flask)
+  t.start()
+  # تشغيل بوت الأخبار
+  news_bot_loop()
