@@ -2,7 +2,6 @@ name: Run Telegram News Bot 24/7
 
 on:
   schedule:
-    # يعمل البوت تلقائياً كل 5 دقائق لضمان استمراره بدون توقف
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -12,12 +11,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.11'
 
     - name: Install dependencies
       run: |
