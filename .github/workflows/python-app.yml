@@ -23,9 +23,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install feedparser requests
 
-    - name: Run Bot Correctly
+    - name: Run Bot
       run: |
-        # البحث عن ملف main.py وتشغيله فوراً بالمسار الصحيح مهما كان مجلد المشروع
-        SCRIPT_PATH=$(find . -name "main.py" -print -quit)
-        echo "Running script at: $SCRIPT_PATH"
-        python "$SCRIPT_PATH"
+        python main.py
