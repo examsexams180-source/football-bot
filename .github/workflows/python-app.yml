@@ -23,8 +23,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install feedparser requests
 
-    - name: Run Bot from correct directory
+    - name: Run Bot Correctly
       run: |
-        # الانتقال المباشر للمجلد الفرعي حيث تتواجد الملفات وتشغيل السكريبت بشكل صحيح
-        cd football-bot || true
-        python main.py
+        # البحث عن ملف main.py وتشغيله فوراً بالمسار الصحيح مهما كان مجلد المشروع
+        SCRIPT_PATH=$(find . -name "main.py" -print -quit)
+        echo "Running script at: $SCRIPT_PATH"
+        python "$SCRIPT_PATH"
