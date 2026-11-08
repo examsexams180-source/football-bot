@@ -25,5 +25,4 @@ jobs:
 
     - name: Run Bot
       run: |
-        # البحث عن مكان ملف main.py وتشغيله أينما كان
-        python "$(find . -name 'main.py' -print -quit)"
+        python main.py
