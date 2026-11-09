@@ -21,7 +21,6 @@ def load_sent_news():
     return []
 
 def save_sent_news(sent_list):
-    # نحتفظ بآخر 300 رابط لضمان عدم تكرار أي خبر إطلاقاً
     with open(SENT_NEWS_FILE, "w") as f:
         json.dump(sent_list[-300:], f)
 
@@ -37,8 +36,7 @@ FOOTBALL_RSS_FEEDS = [
 ]
 
 def translate_text(text):
-    """دالة ترجمة ذكية (لو النص عربي سيبقيه كما هو، ولو إنجليزي سيترجمه للعربية بامتياز)"""
-    # لو النص عربي بالأساس لن نحتاج ترجمة جبارة، لكن للتأكيد نمرره على الترجمة
+    """دالة ترجمة ذكية (لو النص عربي سيحفظه، ولو إنجليزي سيترجمه للعربية بامتياز)"""
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q={requests.utils.quote(text)}"
         response = requests.get(url, timeout=10)
@@ -70,7 +68,6 @@ def main():
     sent_news = load_sent_news()
     articles_sent_count = 0
     
-    # المرور على المصادر لجلب أخبار جديدة متجددة
     for feed_info in FOOTBALL_RSS_FEEDS:
         if articles_sent_count >= 2: # نرسل خبرين في كل دورة تشغيل لتحديث الجروب باستمرار
             break
@@ -82,7 +79,7 @@ def main():
             print(f"Checking source: {source_name}")
             feed = feedparser.parse(feed_url)
             
-            for entry in feed.entries[:8]: # فحص أول 8 أخبار في كل مصدر لضمان إيجاد الخبر الجديد فوراً
+            for entry in feed.entries[:8]:
                 link = entry.link
                 if link in sent_news:
                     continue
@@ -102,4 +99,11 @@ def main():
                 articles_sent_count += 1
                 break
         except Exception as e:
-            print(f"Error parsing {source_name
+            print(f"Error parsing {source_name}: {e}")
+            
+    save_sent_news(sent_news)
+    print(f"Task completed. Total articles sent: {articles_sent_count}")
+
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
