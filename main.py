@@ -3,13 +3,12 @@ import requests
 import feedparser
 import sys
 import json
-from datetime import datetime
 
 # بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
 TELEGRAM_CHAT_ID = "-1003976750898"
 
-# ملف حفظ الروابط المرسلة لمنع تكرار الأخبار
+# ملف حفظ الروابط المرسلة لمنع تكرار الأخبار نهائياً
 SENT_NEWS_FILE = "sent_news.json"
 
 def load_sent_news():
@@ -25,12 +24,12 @@ def save_sent_news(sent_list):
     with open(SENT_NEWS_FILE, "w") as f:
         json.dump(sent_list[-300:], f)
 
-# قائمة واسعة وحقيقية لمصادر كرة القدم العالمية (RSS Feeds)
+# قائمة واسعة وموثوقة 100% لأشهر مصادر كرة القدم العالمية
 FOOTBALL_RSS_FEEDS = [
     {"name": "BBC Sport Football", "url": "https://feeds.bbci.co.uk/sport/football/rss.xml"},
     {"name": "Sky Sports Football", "url": "https://www.skysports.com/rss/12040"},
     {"name": "Transfermarkt News", "url": "https://www.transfermarkt.co.uk/rss/news"},
-    {"name": "Goal.com", "url": "https://www.goal.com/feeds/en/news"},
+    {"name": "Goal.com News", "url": "https://www.goal.com/feeds/en/news"},
     {"name": "ESPN Soccer", "url": "https://www.espn.com/espn/rss/soccer/news"},
     {"name": "TalkSport Football", "url": "https://talksport.com/rss/football/feed"},
     {"name": "90min Football", "url": "https://90min.com/posts.rss"},
@@ -40,7 +39,7 @@ FOOTBALL_RSS_FEEDS = [
 ]
 
 def translate_text(text):
-    """ترجمة فورية للغة العربية الفصحى"""
+    """ترجمة فورية واحترافية للغة العربية الفصحى"""
     try:
         url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q={requests.utils.quote(text)}"
         response = requests.get(url, timeout=10)
@@ -67,57 +66,16 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"Error sending message: {e}")
 
-def get_todays_matches_schedule():
-    """توليد جدول مباريات اليوم مرتباً حسب طلبك بدقة"""
-    today_date = datetime.now().strftime("%Y-%m-%d")
-    
-    schedule = f"📅 **مواعيد مباريات اليوم ({today_date})**\n"
-    schedule += "═══════════════════\n\n"
-    
-    schedule += "🏴󠁧󠁢󠁥󠁮󠁧󠁿 **الدوري الإنجليزي الممتاز:**\n"
-    schedule += "• لا توجد مباريات مسجلة اليوم أو جارٍ التحديث...\n\n"
-    
-    schedule += "🇪🇸 **الدوري الإسباني:**\n"
-    schedule += "• تابع أحدث مواعيد الجولة الحالية...\n\n"
-    
-    schedule += "🇩🇪 **الدوري الألماني:**\n"
-    schedule += "• مباريات حاسمة في صراع القمة...\n\n"
-    
-    schedule += "🇮🇹 **الدوري الإيطالي (السيريا آ):**\n"
-    schedule += "• مواجهات نارية مرتقبة اليوم...\n\n"
-    
-    schedule += "🇫🇷 **الدوري الفرنسي:**\n"
-    schedule += "• منافسات شرسة في ليغ 1...\n\n"
-    
-    schedule += "🇪🇬 **الدوري المصري الممتاز وبطولاته:**\n"
-    schedule += "• مباريات قوية في الدوري وكأس مصر...\n\n"
-    
-    schedule += "🏆 **دوري أبطال أوروبا:**\n"
-    schedule += "• سهرة كروية ممتعة مع كبار القارة...\n\n"
-    
-    schedule += "🇪🇺 **الدوري الأوروبي:**\n"
-    schedule += "• مواجهات الإثارة والقوة...\n\n"
-    
-    schedule += "🌍 **المنتخبات والمباريات الدولية الهامة:**\n"
-    schedule += "• تحضيرات ومواجهات دولية مرتقبة...\n\n"
-    
-    schedule += "⚡ *تابعونا لتغطية حية ومستمرة على مدار الساعة!*"
-    return schedule
-
 def main():
-    print("Ultimate Football Bot started...")
+    print("Multi-source Football News Aggregator started...")
     sent_news = load_sent_news()
+    articles_sent_count = 0
     
-    # 1. إرسال جدول المباريات التجريبي الآن (كما طلبت للتجربة)
-    print("Sending today's matches schedule (Test Mode)...")
-    schedule_msg = get_todays_matches_schedule()
-    send_telegram_message(schedule_msg)
-    
-    # 2. جلب وإرسال خبر رياضي عالمي جديد
-    article_sent = False
+    # نمر على المصادر تباعاً لجلب أخبار متجددة
     for feed_info in FOOTBALL_RSS_FEEDS:
-        if article_sent:
+        if articles_sent_count >= 2: # نرسل خبرين في كل دورة تشغيل لضمان تدفق الأخبار
             break
+            
         source_name = feed_info["name"]
         feed_url = feed_info["url"]
         
@@ -142,13 +100,13 @@ def main():
                 send_telegram_message(message)
                 
                 sent_news.append(link)
-                article_sent = True
+                articles_sent_count += 1
                 break
         except Exception as e:
             print(f"Error parsing {source_name}: {e}")
             
     save_sent_news(sent_news)
-    print("Task completed successfully.")
+    print(f"Task completed. Total articles sent in this run: {articles_sent_count}")
 
 if __name__ == "__main__":
     main()
