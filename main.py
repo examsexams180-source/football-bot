@@ -3,42 +3,47 @@ import requests
 import feedparser
 import sys
 
-# بيانات التيليجرام والبوت الخاصة بك
+# بيانات التيليجرام والبوت ومفتاح Grok الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
 TELEGRAM_CHAT_ID = "-1003976750898"
 GROK_API_KEY = "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"
 
-# قائمة واسعة تضم أشهر مصادر الأخبار العالمية والرياضية والتقنية (RSS Feeds)
-RSS_FEEDS = [
-    # --- كرة القدم والرياضة ---
+# مصادر RSS مخصصة لكرة القدم والرياضة فقط
+FOOTBALL_RSS_FEEDS = [
     "https://www.transfermarkt.co.uk/rss/news",
-    "https://feeds.bbci.co.uk/sport/rss.xml",
+    "https://feeds.bbci.co.uk/sport/football/rss.xml",
     "https://www.skysports.com/rss/12040",
-    "https://talksport.com/rss/sports-news/all/feed",
-    "https://www.espn.com/espn/rss/news",
-    "https://rss.nytimes.com/services/xml/rss/nyt/Sports.xml",
-    "https://theathletic.com/feed/",
-    
-    # --- الأخبار العالمية والسياسية الكبرى ---
-    "https://feeds.bbci.co.uk/news/world/rss.xml",
-    "http://rss.cnn.com/rss/edition_world.rss",
-    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "https://www.theguardian.com/world/rss",
-    "https://www.aljazeera.com/xml/rss/all.xml",
-    "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
-    "https://www.cbsnews.com/latest/rss/main/",
-    "https://feeds.npr.org/1001/rss.xml",
-    "https://time.com/feed/",
-    "https://globalnews.ca/world/feed/",
-    
-    # --- التكنولوجيا والعلوم ---
-    "https://www.theverge.com/rss/index.xml",
-    "https://www.wired.com/feed/rss",
-    "https://feeds.arstechnica.com/arstechnica/index",
-    "https://www.cnet.com/rss/all/",
-    "https://www.nasa.gov/rss/dyn/breaking_news.rss",
-    "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"
+    "https://talksport.com/rss/football/feed"
 ]
+
+def summarize_with_grok(news_title):
+    """دالة لإعادة صياغة وتلخيص الخبر باستخدام ذكاء Grok الاصطناعي"""
+    url = "https://api.x.ai/v1/chat/completions"  # نقطة النهاية الرسمية لـ Grok API
+    headers = {
+        "Authorization": f"Bearer {GROK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    prompt = f"قم بإعادة صياغة هذا الخبر الرياضي باللغة العربية بأسلوب احترافي وجذاب ومثير للاهتمام لجروب كرة القدم:\n\n{news_title}"
+    
+    payload = {
+        "model": "grok-beta",  # أو النموذج المعتمد لديك
+        "messages": [
+            {"role": "system", "content": "أنت محرر رياضي محترف ومتخصص في تلخيص أخبار كرة القدم."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Grok API Error: {e}")
+    
+    # في حال حدث أي خطأ مع الـ API، نرجع العنوان الأصلي كخطة بديلة
+    return news_title
 
 def send_telegram_message(message):
     """دالة لإرسال الرسالة إلى تيليجرام"""
@@ -58,29 +63,32 @@ def send_telegram_message(message):
         print(f"Error sending message: {e}")
 
 def main():
-    print("Multi-source news bot worker started...")
+    print("Smart Football Bot worker started...")
     
-    news_found = False
-    
-    # المرور على كل روابط الـ RSS في القائمة وجلب أحدث خبر من كل مصدر
-    for url in RSS_FEEDS:
+    # نأخذ أحدث خبر من أول مصدر رياضي نشط لتجنب إرسال كميات كبيرة دفعة واحدة
+    for url in FOOTBALL_RSS_FEEDS:
         try:
             feed = feedparser.parse(url)
             if feed.entries:
                 latest_entry = feed.entries[0]
-                title = latest_entry.title
+                raw_title = latest_entry.title
                 link = latest_entry.link
+                source_name = feed.feed.get("title", "مصدر رياضي")
                 
-                # صياغة وإرسال الخبر
-                message = f"🌍 **خبر عاجل / رياضي جديد**\n\n{title}\n\n🔗 [اقرأ التفاصيل]({link})"
+                print(f"Processing news from: {source_name}")
+                
+                # تلخيص وتتمة الخبر عبر ذكاء Grok
+                summarized_news = summarize_with_grok(raw_title)
+                
+                # صياغة الرسالة النهائية مع اسم المصدر والتلخيص واللينك
+                message = f"⚽ **{summarized_news}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                
+                # إرسال الخبر للتيليجرام
                 send_telegram_message(message)
-                news_found = True
+                break  # نكتفي بخبر واحد ممتاز في كل دورة (كل 5 دقائق) لكي يكون العمل منظماً
         except Exception as e:
             print(f"Error parsing {url}: {e}")
             
-    if not news_found:
-        print("No news found in any RSS feed.")
-    
     print("Task completed successfully. Exiting now.")
 
 if __name__ == "__main__":
