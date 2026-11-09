@@ -17,18 +17,18 @@ FOOTBALL_RSS_FEEDS = [
 ]
 
 def summarize_with_grok(news_title):
-    """دالة لإعادة صياغة وتلخيص الخبر باستخدام ذكاء Grok الاصطناعي"""
-    url = "https://api.x.ai/v1/chat/completions"  # نقطة النهاية الرسمية لـ Grok API
+    """دالة لترجمة وتلخيص وإعادة صياغة الخبر باستخدام ذكاء Grok الاصطناعي باللغة العربية"""
+    url = "https://api.x.ai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROK_API_KEY}",
         "Content-Type": "application/json"
     }
-    prompt = f"قم بإعادة صياغة هذا الخبر الرياضي باللغة العربية بأسلوب احترافي وجذاب ومثير للاهتمام لجروب كرة القدم:\n\n{news_title}"
+    prompt = f"قم بترجمة هذا الخبر الرياضي إلى اللغة العربية، ولخصه وأعد صياغته بأسلوب احترافي وجذاب ومثير للاهتمام لعشاق كرة القدم:\n\n{news_title}"
     
     payload = {
-        "model": "grok-beta",  # أو النموذج المعتمد لديك
+        "model": "grok-2",  # استخدام النموذج القياسي المستقر
         "messages": [
-            {"role": "system", "content": "أنت محرر رياضي محترف ومتخصص في تلخيص أخبار كرة القدم."},
+            {"role": "system", "content": "أنت محرر رياضي محترف ومتخصص في ترجمة وتلخيص أخبار كرة القدم باللغة العربية."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7
@@ -39,10 +39,12 @@ def summarize_with_grok(news_title):
         if response.status_code == 200:
             data = response.json()
             return data["choices"]["message"]["content"].strip()
+        else:
+            print(f"Grok API failed with status {response.status_code}: {response.text}")
     except Exception as e:
         print(f"Grok API Error: {e}")
     
-    # في حال حدث أي خطأ مع الـ API، نرجع العنوان الأصلي كخطة بديلة
+    # في حال حدوث أي استثناء، نرجع العنوان الأصلي كخطة بديلة
     return news_title
 
 def send_telegram_message(message):
@@ -65,7 +67,7 @@ def send_telegram_message(message):
 def main():
     print("Smart Football Bot worker started...")
     
-    # نأخذ أحدث خبر من أول مصدر رياضي نشط لتجنب إرسال كميات كبيرة دفعة واحدة
+    # نأخذ أحدث خبر من أول مصدر رياضي نشط
     for url in FOOTBALL_RSS_FEEDS:
         try:
             feed = feedparser.parse(url)
@@ -77,15 +79,15 @@ def main():
                 
                 print(f"Processing news from: {source_name}")
                 
-                # تلخيص وتتمة الخبر عبر ذكاء Grok
+                # ترجمة وتلخيص الخبر عبر ذكاء Grok بالعربية
                 summarized_news = summarize_with_grok(raw_title)
                 
-                # صياغة الرسالة النهائية مع اسم المصدر والتلخيص واللينك
+                # صياغة الرسالة النهائية باللغة العربية
                 message = f"⚽ **{summarized_news}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
                 
                 # إرسال الخبر للتيليجرام
                 send_telegram_message(message)
-                break  # نكتفي بخبر واحد ممتاز في كل دورة (كل 5 دقائق) لكي يكون العمل منظماً
+                break  # نكتفي بخبر واحد ممتاز في كل دورة
         except Exception as e:
             print(f"Error parsing {url}: {e}")
             
