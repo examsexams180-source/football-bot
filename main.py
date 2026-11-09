@@ -2,65 +2,108 @@ import os
 import requests
 import feedparser
 import sys
+import json
 
-# بيانات التيليجرام ومفتاح Grok الخاص بك
+# بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
 TELEGRAM_CHAT_ID = "-1003976750898"
-GROK_API_KEY = "grok_597c29bf36d4744f2978f187039eac33_308f81e4e270c35caf567b540c75aed24d8f82ae45fbeac50638882a87791e0c"
 
-def test_grok_directly():
-    """دالة لاختبار مفتاح وخدمة Grok API بشكل مباشر ومفصل"""
-    url = "https://api.x.ai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": "grok-2",
-        "messages": [
-            {"role": "system", "content": "أنت مساعد ذكي."},
-            {"role": "user", "content": "اكتب جملة قصيرة جداً تثبت أنك تعمل بشكل صحيح باللغة العربية."}
-        ],
-        "temperature": 0.7
-    }
-    
-    print("--- بدء اختبار اتصال Grok API ---")
+# ملف حفظ الروابط المرسلة لمنع تكرار الأخبار نهائياً
+SENT_NEWS_FILE = "sent_news.json"
+
+def load_sent_news():
+    if os.path.exists(SENT_NEWS_FILE):
+        try:
+            with open(SENT_NEWS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_sent_news(sent_list):
+    with open(SENT_NEWS_FILE, "w") as f:
+        json.dump(sent_list[-100:], f)
+
+# مصادر RSS قوية ومحدثة لكرة القدم
+FOOTBALL_RSS_FEEDS = [
+    "https://www.transfermarkt.co.uk/rss/news",
+    "https://feeds.bbci.co.uk/sport/football/rss.xml",
+    "https://www.skysports.com/rss/12040",
+    "https://talksport.com/rss/football/feed",
+    "https://www.espn.com/espn/rss/soccer/news",
+    "https://90min.com/posts.rss"
+]
+
+def translate_and_format(text):
+    """دالة ترجمة فورية واحترافية للغة العربية الفصحى"""
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=20)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response Body: {response.text}")
-        
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q={requests.utils.quote(text)}"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            data = response.json()
-            reply = data["choices"][0]["message"]["content"].strip()
-            print(f"✅ نجح الاتصال بـ Grok! الرد كان: {reply}")
-            return reply
-        else:
-            print(f"❌ فشل الاتصال بـ Grok. الكود: {response.status_code}")
+            result = response.json()
+            translated = "".join([item[0] for item in result[0] if item[0]])
+            return translated
     except Exception as e:
-        print(f"❌ حدث خطأ استثنائي أثناء الاتصال: {e}")
-    print("--- نهاية اختبار الاتصال ---")
-    return None
+        print(f"Translation Error: {e}")
+    return text
 
-def main():
-    print("Grok diagnostic test started...")
-    
-    # إجراء اختبار مباشر لـ Grok وطباعة النتيجة في السجلات
-    grok_response = test_grok_directly()
-    
-    # إرسال رسالة تجريبية لتيليجرام تخبرنا بحالة الاختبار
+def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    status_msg = f"🧪 **تقرير اختبار البوت:**\n\nرد الذكاء الاصطناعي (Grok):\n`{grok_response}`"
-    
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": status_msg,
+        "text": message,
         "parse_mode": "Markdown"
     }
-    requests.post(url, json=payload)
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("Message sent successfully to Telegram!")
+        else:
+            print(f"Failed to send message: {response.text}")
+    except Exception as e:
+        print(f"Error sending message: {e}")
+
+def main():
+    print("Stable Arabic Football Bot started...")
+    sent_news = load_sent_news()
+    news_sent_count = 0
     
-    print("Test task completed. Exiting.")
+    for url in FOOTBALL_RSS_FEEDS:
+        try:
+            print(f"Checking RSS Feed: {url}")
+            feed = feedparser.parse(url)
+            
+            for entry in feed.entries[:5]:
+                link = entry.link
+                if link in sent_news:
+                    continue
+                
+                raw_title = entry.title
+                raw_summary = entry.get("summary", entry.get("description", ""))
+                source_name = feed.feed.get("title", "مصدر رياضي عالمي")
+                
+                print(f"Found new article: {raw_title}")
+                
+                # دمج العنوان والملخص وترجمتهم باحترافية للعربية
+                full_raw_text = f"{raw_title}. {raw_summary[:200]}"
+                arabic_text = translate_and_format(full_raw_text)
+                
+                # صياغة الرسالة النهائية بأسلوب رياضي أنيق
+                message = f"⚽ **{arabic_text}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                
+                send_telegram_message(message)
+                
+                sent_news.append(link)
+                news_sent_count += 1
+                break # نكتفي بخبر جديد ممتاز في كل دورة
+                
+            if news_sent_count > 0:
+                break
+        except Exception as e:
+            print(f"Error parsing feed {url}: {e}")
+            
+    save_sent_news(sent_news)
+    print("Task completed successfully. Exiting now.")
 
 if __name__ == "__main__":
     main()
