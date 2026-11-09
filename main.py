@@ -3,10 +3,13 @@ import requests
 import feedparser
 import sys
 
-# ضع بياناتك هنا مباشرة
-TELEGRAM_BOT_TOKEN = "ضع_توكن_البوت_هنا"
-TELEGRAM_CHAT_ID = "ضع_آيدي_الجروب_هنا"
-RSS_FEED_URL = "ضع_رابط_الـ_RSS_هنا"
+# بيانات التيليجرام والبوت الخاصة بك
+TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
+TELEGRAM_CHAT_ID = "-1003976750898"
+GROK_API_KEY = "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"
+
+# رابط خلاصة الـ RSS لموقع Transfermarkt
+RSS_FEED_URL = "https://www.transfermarkt.co.uk/rss/news"
 
 def send_telegram_message(message):
     """دالة لإرسال الرسالة إلى تيليجرام"""
@@ -41,7 +44,7 @@ def main():
     link = latest_entry.link
     
     # صياغة الرسالة
-    message = f"⚽ **خبر رياضي جديد**\n\n{title}\n\n🔗 [اقرأ التفاصيل]({link})"
+    message = f"⚽ **خبر رياضي جديد من Transfermarkt**\n\n{title}\n\n🔗 [اقرأ التفاصيل]({link})"
     
     # إرسال الخبر
     send_telegram_message(message)
