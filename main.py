@@ -21,17 +21,19 @@ def load_sent_news():
     return []
 
 def save_sent_news(sent_list):
+    # ناحتفظ بآخر 200 رابط لمنع التكرار تماماً على مدار الأيام
     with open(SENT_NEWS_FILE, "w") as f:
-        json.dump(sent_list[-100:], f)
+        json.dump(sent_list[-200:], f)
 
-# مصادر RSS قوية ومحدثة لكرة القدم
+# شبكة مصادر عالمية ضخمة ومتنوعة لأخبار كرة القدم من كل مكان في العالم
 FOOTBALL_RSS_FEEDS = [
-    "https://www.transfermarkt.co.uk/rss/news",
-    "https://feeds.bbci.co.uk/sport/football/rss.xml",
-    "https://www.skysports.com/rss/12040",
-    "https://talksport.com/rss/football/feed",
-    "https://www.espn.com/espn/rss/soccer/news",
-    "https://90min.com/posts.rss"
+    {"name": "BBC Sport Football", "url": "https://feeds.bbci.co.uk/sport/football/rss.xml"},
+    {"name": "Sky Sports Football", "url": "https://www.skysports.com/rss/12040"},
+    {"name": "Transfermarkt News", "url": "https://www.transfermarkt.co.uk/rss/news"},
+    {"name": "Goal.com", "url": "https://www.goal.com/feeds/en/news"},
+    {"name": "ESPN Soccer", "url": "https://www.espn.com/espn/rss/soccer/news"},
+    {"name": "TalkSport Football", "url": "https://talksport.com/rss/football/feed"},
+    {"name": "90min Football", "url": "https://90min.com/posts.rss"}
 ]
 
 def translate_and_format(text):
@@ -64,43 +66,51 @@ def send_telegram_message(message):
         print(f"Error sending message: {e}")
 
 def main():
-    print("Stable Arabic Football Bot started...")
+    print("Global Football News Aggregator started...")
     sent_news = load_sent_news()
-    news_sent_count = 0
+    article_sent = False
     
-    for url in FOOTBALL_RSS_FEEDS:
-        try:
-            print(f"Checking RSS Feed: {url}")
-            feed = feedparser.parse(url)
+    # نمر على المصادر المختلفة بالتدريج للبحث عن خبر جديد لم يُرسل من قبل
+    for feed_info in FOOTBALL_RSS_FEEDS:
+        if article_sent:
+            break
             
+        source_name = feed_info["name"]
+        feed_url = feed_info["url"]
+        
+        try:
+            print(f"Checking source: {source_name}")
+            feed = feedparser.parse(feed_url)
+            
+            # فحص أول 5 أخبار في كل مصدر
             for entry in feed.entries[:5]:
                 link = entry.link
+                
+                # إذا كان الخبر أُرسل من قبل، نتخطاه ونبحث عن غيره
                 if link in sent_news:
                     continue
                 
                 raw_title = entry.title
                 raw_summary = entry.get("summary", entry.get("description", ""))
-                source_name = feed.feed.get("title", "مصدر رياضي عالمي")
                 
-                print(f"Found new article: {raw_title}")
+                print(f"Found new article from {source_name}: {raw_title}")
                 
                 # دمج العنوان والملخص وترجمتهم باحترافية للعربية
-                full_raw_text = f"{raw_title}. {raw_summary[:200]}"
+                full_raw_text = f"{raw_title}. {raw_summary}"
                 arabic_text = translate_and_format(full_raw_text)
                 
-                # صياغة الرسالة النهائية بأسلوب رياضي أنيق
+                # صياغة الرسالة النهائية بشكل أنيق وجذاب
                 message = f"⚽ **{arabic_text}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
                 
                 send_telegram_message(message)
                 
+                # تسجيل الرابط ضمن الأخبار المرسلة
                 sent_news.append(link)
-                news_sent_count += 1
-                break # نكتفي بخبر جديد ممتاز في كل دورة
-                
-            if news_sent_count > 0:
+                article_sent = True
                 break
+                
         except Exception as e:
-            print(f"Error parsing feed {url}: {e}")
+            print(f"Error parsing feed {source_name}: {e}")
             
     save_sent_news(sent_news)
     print("Task completed successfully. Exiting now.")
