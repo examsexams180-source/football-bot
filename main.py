@@ -21,27 +21,26 @@ def load_sent_news():
     return []
 
 def save_sent_news(sent_list):
+    # نحتفظ بآخر 300 رابط لضمان عدم تكرار أي خبر إطلاقاً
     with open(SENT_NEWS_FILE, "w") as f:
         json.dump(sent_list[-300:], f)
 
-# قائمة واسعة وموثوقة 100% لأشهر مصادر كرة القدم العالمية
+# قائمة مصادر RSS حقيقية ومتجددة لحظة بلحظة (عربية وعالمية)
 FOOTBALL_RSS_FEEDS = [
+    {"name": "موقع بطولات - مصر والعالم", "url": "https://www.btolat.com/rss/newsfeed"},
     {"name": "BBC Sport Football", "url": "https://feeds.bbci.co.uk/sport/football/rss.xml"},
     {"name": "Sky Sports Football", "url": "https://www.skysports.com/rss/12040"},
     {"name": "Transfermarkt News", "url": "https://www.transfermarkt.co.uk/rss/news"},
     {"name": "Goal.com News", "url": "https://www.goal.com/feeds/en/news"},
-    {"name": "ESPN Soccer", "url": "https://www.espn.com/espn/rss/soccer/news"},
     {"name": "TalkSport Football", "url": "https://talksport.com/rss/football/feed"},
-    {"name": "90min Football", "url": "https://90min.com/posts.rss"},
-    {"name": "Football Italia", "url": "https://football-italia.net/feed/"},
-    {"name": "Marca English", "url": "https://e00-marca.uecdn.es/rss/en/football.xml"},
-    {"name": "AS English", "url": "https://en.as.com/rss/futbol/primera.xml"}
+    {"name": "90min Football", "url": "https://90min.com/posts.rss"}
 ]
 
 def translate_text(text):
-    """ترجمة فورية واحترافية للغة العربية الفصحى"""
+    """دالة ترجمة ذكية (لو النص عربي سيبقيه كما هو، ولو إنجليزي سيترجمه للعربية بامتياز)"""
+    # لو النص عربي بالأساس لن نحتاج ترجمة جبارة، لكن للتأكيد نمرره على الترجمة
     try:
-        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q={requests.utils.quote(text)}"
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ar&dt=t&q={requests.utils.quote(text)}"
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             result = response.json()
@@ -67,13 +66,13 @@ def send_telegram_message(message):
         print(f"Error sending message: {e}")
 
 def main():
-    print("Multi-source Football News Aggregator started...")
+    print("Super Football News Aggregator started...")
     sent_news = load_sent_news()
     articles_sent_count = 0
     
-    # نمر على المصادر تباعاً لجلب أخبار متجددة
+    # المرور على المصادر لجلب أخبار جديدة متجددة
     for feed_info in FOOTBALL_RSS_FEEDS:
-        if articles_sent_count >= 2: # نرسل خبرين في كل دورة تشغيل لضمان تدفق الأخبار
+        if articles_sent_count >= 2: # نرسل خبرين في كل دورة تشغيل لتحديث الجروب باستمرار
             break
             
         source_name = feed_info["name"]
@@ -83,7 +82,7 @@ def main():
             print(f"Checking source: {source_name}")
             feed = feedparser.parse(feed_url)
             
-            for entry in feed.entries[:5]:
+            for entry in feed.entries[:8]: # فحص أول 8 أخبار في كل مصدر لضمان إيجاد الخبر الجديد فوراً
                 link = entry.link
                 if link in sent_news:
                     continue
@@ -103,11 +102,4 @@ def main():
                 articles_sent_count += 1
                 break
         except Exception as e:
-            print(f"Error parsing {source_name}: {e}")
-            
-    save_sent_news(sent_news)
-    print(f"Task completed. Total articles sent in this run: {articles_sent_count}")
-
-if __name__ == "__main__":
-    main()
-    sys.exit(0)
+            print(f"Error parsing {source_name
