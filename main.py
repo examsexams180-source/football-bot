@@ -3,7 +3,7 @@ import requests
 import feedparser
 import sys
 
-# بيانات التيليجرام والبوت ومفتاح Grok الجديد الخاص بك
+# بيانات التيليجرام والبوت ومفتاح Grok الخاص بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
 TELEGRAM_CHAT_ID = "-1003976750898"
 GROK_API_KEY = "grok_597c29bf36d4744f2978f187039eac33_308f81e4e270c35caf567b540c75aed24d8f82ae45fbeac50638882a87791e0c"
@@ -24,9 +24,7 @@ def summarize_full_news_with_grok(news_title, news_summary):
         "Content-Type": "application/json"
     }
     
-    # دمج العنوان مع محتوى الخبر لضمان تلخيص الخبر بالكامل
     full_text = f"العنوان: {news_title}\nالمحتوى: {news_summary}"
-    
     prompt = f"قم بقراءة هذا الخبر الرياضي بالكامل، ولخصه وأعد صياغته بأسلوب احترافي وجذاب ومثير للاهتمام لعشاق كرة القدم باللغة العربية الفصحى (في حدود 3 إلى 4 أسطر):\n\n{full_text}"
     
     payload = {
@@ -48,7 +46,6 @@ def summarize_full_news_with_grok(news_title, news_summary):
     except Exception as e:
         print(f"Grok Exception: {e}")
         
-    # خطة بديلة في حال حدث أي ضغط على الـ API
     return news_title
 
 def send_telegram_message(message):
@@ -77,13 +74,23 @@ def main():
             if feed.entries:
                 latest_entry = feed.entries[0]
                 raw_title = latest_entry.title
-                
-                # جلب محتوى الخبر أو ملخصه المتاح في الـ RSS (إن وجد)
                 raw_summary = latest_entry.get("summary", latest_entry.get("description", ""))
                 link = latest_entry.link
                 source_name = feed.feed.get("title", "مصدر رياضي")
                 
                 print(f"Processing full news from: {source_name}")
                 
-                # تلخيص الخبر بالكامل عبر ذكاء Grok
-                grok_summary = summarize_full_news
+                grok_summary = summarize_full_news_with_grok(raw_title, raw_summary)
+                
+                message = f"⚽ **{grok_summary}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                
+                send_telegram_message(message)
+                break
+        except Exception as e:
+            print(f"Error parsing {url}: {e}")
+            
+    print("Task completed successfully. Exiting now.")
+
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
