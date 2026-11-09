@@ -3,12 +3,11 @@ import requests
 import feedparser
 import sys
 
-# بيانات التيليجرام والبوت ومفتاح Grok الخاصة بك
+# بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
 TELEGRAM_CHAT_ID = "-1003976750898"
-GROK_API_KEY = "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"
 
-# مصادر RSS مخصصة لكرة القدم والرياضة فقط
+# مصادر RSS مخصصة لكرة القدم فقط
 FOOTBALL_RSS_FEEDS = [
     "https://www.transfermarkt.co.uk/rss/news",
     "https://feeds.bbci.co.uk/sport/football/rss.xml",
@@ -16,39 +15,21 @@ FOOTBALL_RSS_FEEDS = [
     "https://talksport.com/rss/football/feed"
 ]
 
-def summarize_with_grok(news_title):
-    """دالة لترجمة وتلخيص وإعادة صياغة الخبر باستخدام ذكاء Grok الاصطناعي باللغة العربية"""
-    url = "https://api.x.ai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    prompt = f"قم بترجمة هذا الخبر الرياضي إلى اللغة العربية، ولخصه وأعد صياغته بأسلوب احترافي وجذاب ومثير للاهتمام لعشاق كرة القدم:\n\n{news_title}"
-    
-    payload = {
-        "model": "grok-2",  # استخدام النموذج القياسي المستقر
-        "messages": [
-            {"role": "system", "content": "أنت محرر رياضي محترف ومتخصص في ترجمة وتلخيص أخبار كرة القدم باللغة العربية."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7
-    }
-    
+def translate_to_arabic(text):
+    """دالة لترجمة النص تلقائياً إلى اللغة العربية عبر محرك ترجمة مجاني وسريع"""
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q={requests.utils.quote(text)}"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            data = response.json()
-            return data["choices"]["message"]["content"].strip()
-        else:
-            print(f"Grok API failed with status {response.status_code}: {response.text}")
+            result = response.json()
+            translated_text = "".join([item[0] for item in result[0] if item[0]])
+            return translated_text
     except Exception as e:
-        print(f"Grok API Error: {e}")
-    
-    # في حال حدوث أي استثناء، نرجع العنوان الأصلي كخطة بديلة
-    return news_title
+        print(f"Translation Error: {e}")
+    return text
 
 def send_telegram_message(message):
-    """دالة لإرسال الرسالة إلى تيليجرام"""
+    """إرسال الرسالة إلى تيليجرام"""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -67,7 +48,6 @@ def send_telegram_message(message):
 def main():
     print("Smart Football Bot worker started...")
     
-    # نأخذ أحدث خبر من أول مصدر رياضي نشط
     for url in FOOTBALL_RSS_FEEDS:
         try:
             feed = feedparser.parse(url)
@@ -75,19 +55,18 @@ def main():
                 latest_entry = feed.entries[0]
                 raw_title = latest_entry.title
                 link = latest_entry.link
-                source_name = feed.feed.get("title", "مصدر رياضي")
+                source_name = feed.feed.get("title", "Transfermarkt / مصدر رياضي")
                 
-                print(f"Processing news from: {source_name}")
+                print(f"Processing news: {raw_title}")
                 
-                # ترجمة وتلخيص الخبر عبر ذكاء Grok بالعربية
-                summarized_news = summarize_with_grok(raw_title)
+                # ترجمة الخبر للغة العربية
+                arabic_title = translate_to_arabic(raw_title)
                 
                 # صياغة الرسالة النهائية باللغة العربية
-                message = f"⚽ **{summarized_news}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                message = f"⚽ **{arabic_title}**\n\n📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
                 
-                # إرسال الخبر للتيليجرام
                 send_telegram_message(message)
-                break  # نكتفي بخبر واحد ممتاز في كل دورة
+                break
         except Exception as e:
             print(f"Error parsing {url}: {e}")
             
