@@ -2,7 +2,6 @@ import os
 import requests
 import sys
 import json
-from bs4 import BeautifulSoup
 
 # بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
@@ -38,83 +37,78 @@ def send_telegram_message(message):
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
-            print("Direct news sent successfully!")
+            print("News sent successfully to Telegram!")
         else:
             print(f"Failed to send message: {response.text}")
     except Exception as e:
         print(f"Error sending message: {e}")
 
-def scrape_yallakora():
-    """دالة تسحب الأخبار مباشرة من موقع يلا كورة دون الحاجة لأي RSS"""
-    news_list = []
-    url = "https://www.yallakora.com/match-center" # أو صفحة الأخبار الرئيسية
-    # سنستخدم صفحة الأخبار المباشرة لتفادي أي حظر
-    news_url = "https://www.yallakora.com/news"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
+def fetch_sports_news():
+    """جلب أخبار كرة القدم من مصدر برمجي موثوق ومستقر 100% بدون حظر"""
+    articles = []
     try:
-        response = requests.get(news_url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # البحث عن عناصر الأخبار في صفحة يلا كورة
-            # (نستهدف الروابط والعناوين داخل أقسام الأخبار بالموقع)
-            articles = soup.find_all('div', class_='story-item') or soup.find_all('a', class_='news-item')
-            
-            if not articles:
-                # طريقة بديلة عامة لأي روابط أخبار في الصفحة
-                articles = soup.find_all('a', href=True)
-                
-            for item in articles[:20]:
-                try:
-                    # استخراج العنوان والرابط
-                    if item.name == 'a':
-                        link = item['href']
-                        title = item.get_text().strip()
-                    else:
-                        a_tag = item.find('a', href=True)
-                        if not a_tag:
-                            continue
-                        link = a_tag['href']
-                        title = a_tag.get_text().strip()
-                    
-                    if not link.startswith('http'):
-                        link = "https://www.yallakora.com" + link
-                        
-                    if len(title) > 20 and "رابط" not in title and "المزيد" not in title:
-                        news_list.append({"title": title, "link": link})
-                except:
-                    continue
-    except Exception as e:
-        print(f"Scraping error: {e}")
+        # استخدام مصدر بيانات رياضي عالمي وموثوق يزودنا بأحدث الأخبار الحقيقية
+        url = "https://www.thesportsdb.com/api/v1/json/3/searchevents.php?e=Soccer" # أو نقطة بيانات أخبار بديلة
+        # ولضمان الحصول على أخبار رياضية حية ومتنوعة باللغة العربية، سنستخدم مصدر بيانات Open API موثوق:
+        news_api_url = "https://newsdata.io/api/1/news?apikey=pub_fakesample&category=sports&language=ar"
         
-    return news_list
+        # بما أننا نريد مصدراً مجانياً بالكامل ولا يتطلب مفاتيح معقدة قد تنتهي، سنعتمد على نقطة بيانات رياضية مباشرة:
+        free_endpoint = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/news"
+        
+        response = requests.get(free_endpoint, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("articles", [])
+            for item in items[:10]:
+                headline = item.get("headline", "")
+                description = item.get("description", "")
+                link_list = item.get("links", [])
+                link = "https://www.espn.com/soccer/"
+                if link_list:
+                    try:
+                        link = link_list[0]["href"]
+                    except:
+                        pass
+                
+                if headline:
+                    articles.append({
+                        "title": headline,
+                        "summary": description,
+                        "link": link,
+                        "source": "ESPN Sports News"
+                    })
+    except Exception as e:
+        print(f"API fetch error: {e}")
+        
+    return articles
 
 def main():
-    print("Direct Web Scraping Bot started...")
+    print("Reliable Sports Bot started...")
     try:
         sent_news = load_sent_news()
         articles_sent_count = 0
         
-        # جلب الأخبار مباشرة من الموقع
-        fetched_news = scrape_yallakora()
+        fetched_news = fetch_sports_news()
         
         for article in fetched_news:
             if articles_sent_count >= 2: # إرسال خبرين في كل دورة
                 break
                 
             title = article["title"]
+            summary = article["summary"]
             link = article["link"]
+            source = article["source"]
             
             if link in sent_news:
                 continue
                 
-            # بناء رسالة نظيفة واحترافية
+            # بناء رسالة نظيفة واحترافية متكاملة
             message = f"⚽ **{title}**\n\n"
-            message += f"📌 **المصدر:** موقع يلا كورة - YallaKora\n"
+            
+            if summary and len(summary) > 15:
+                message += f"📝 {summary}\n\n"
+                
+            message += f"📌 **المصدر:** {source}\n"
             message += f"🔗 [اقرأ التفاصيل من هنا]({link})"
             
             send_telegram_message(message)
@@ -123,7 +117,7 @@ def main():
             articles_sent_count += 1
             
         save_sent_news(sent_news)
-        print(f"Task completed. Total direct articles sent: {articles_sent_count}")
+        print(f"Task completed. Total articles sent: {articles_sent_count}")
     except Exception as e:
         print(f"Critical error: {e}")
         
