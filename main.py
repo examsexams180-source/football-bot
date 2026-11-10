@@ -3,7 +3,7 @@ import requests
 import feedparser
 import sys
 import json
-from datetime import datetime
+from bs4 import BeautifulSoup
 
 # بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
@@ -22,14 +22,13 @@ def load_sent_news():
     return []
 
 def save_sent_news(sent_list):
-    # نحتفظ بآخر 400 رابط لضمان عدم التكرار نهائياً
     with open(SENT_NEWS_FILE, "w") as f:
         json.dump(sent_list[-400:], f)
 
-# روابط Google News RSS الشاملة لكل أخبار كرة القدم المحلية والعالمية
+# مصادر Google News RSS شاملة لكل أخبار الكرة
 GOOGLE_NEWS_FEEDS = [
     {
-        "name": "أخبار كرة القدم العامة (Google News)", 
+        "name": "أخبار كرة القدم العامة", 
         "url": "https://news.google.com/rss/search?q=%D9%83%D8%B1%D8%A9+%D9%82%D8%AF%D9%85&hl=ar&gl=EG&ceid=EG:ar"
     },
     {
@@ -39,16 +38,34 @@ GOOGLE_NEWS_FEEDS = [
     {
         "name": "موقع يلا كورة - YallaKora", 
         "url": "https://news.google.com/rss/search?q=site:yallakora.com&hl=ar&gl=EG&ceid=EG:ar"
-    },
-    {
-        "name": "موقع كووورة - Kooora", 
-        "url": "https://news.google.com/rss/search?q=site:kooora.com&hl=ar&gl=EG&ceid=EG:ar"
-    },
-    {
-        "name": "الدوري الإنجليزي ودوري الأبطال", 
-        "url": "https://news.google.com/rss/search?q=%D8%A7%D9%84%D8%AF%D9%88%D8%B1%D9%8A+%D8%A7%D9%84%D8%A5%D9%86%D8%AC%D9%84%D9%8A%D8%B2%D9%8A+OR+%D8%AF%D9%88%D8%B1%D9%8A+%D8%A3%D8%A8%D8%B7%D8%A7%D9%84+%D8%A3%D9%88%D8%B1%D9%88%D8%A8%D8%A7&hl=ar&gl=EG&ceid=EG:ar"
     }
 ]
+
+def fetch_full_article_text(url):
+    """دالة تقوم بالدخول على رابط الخبر وسحب تفاصيله الكاملة لكي يقرأها المتابع من التيليجرام مباشرة"""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # محاولة استخراج الفقرات النصية من المقال
+            paragraphs = soup.find_all('p')
+            article_text = ""
+            for p in paragraphs:
+                text = p.get_text().strip()
+                # نأخذ الفقرات المفيدة التي طولها أكبر من 30 حرفاً
+                if len(text) > 30 and "حقوق الملكية" not in text and "جميع الحقوق محفوظة" not in text:
+                    article_text += text + "\n\n"
+                    if len(article_text) > 600:  # نكتفي بأول 600 حرف ليكون الخبر مكثفاً ومرتباً
+                        break
+            
+            if len(article_text) > 50:
+                return article_text.strip()
+    except Exception as e:
+        print(f"Error scraping article text: {e}")
+    
+    return None
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -56,7 +73,7 @@ def send_telegram_message(message):
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "Markdown",
-        "disable_web_page_preview": True  # إلغاء معاينة الصور والروابط تماماً لتظهر الرسالة نصية نظيفة
+        "disable_web_page_preview": True  # إلغاء الصور والمعاينة نهائياً
     }
     try:
         response = requests.post(url, json=payload)
@@ -68,13 +85,12 @@ def send_telegram_message(message):
         print(f"Error sending message: {e}")
 
 def main():
-    print("Google News Football Bot started...")
+    print("Full Content Football Bot started...")
     sent_news = load_sent_news()
     articles_sent_count = 0
     
-    # المرور على المصادر لجلب أحدث الأخبار
     for feed_info in GOOGLE_NEWS_FEEDS:
-        if articles_sent_count >= 2: # نرسل خبرين في كل دورة تشغيل لضمان استمرارية النشر
+        if articles_sent_count >= 2: # خبرين في كل دورة تشغيل
             break
             
         source_name = feed_info["name"]
@@ -90,20 +106,20 @@ def main():
                     continue
                 
                 raw_title = entry.get("title", "")
-                raw_summary = entry.get("summary", entry.get("description", ""))
+                print(f"Found article to process: {raw_title}")
                 
-                print(f"Found new article: {raw_title}")
+                # جلب تفاصيل الخبر الكاملة من داخل الموقع
+                full_details = fetch_full_article_text(link)
                 
-                # تنسيق الرسالة بشكل أنيق ونظيف بدون صور
+                # بناء رسالة متكاملة وغنية بالمعلومات
                 message = f"⚽ **{raw_title}**\n\n"
                 
-                if raw_summary and len(raw_summary) > 10:
-                    # تنظيف الملخص من أي أكواد HTML عشوائية
-                    clean_summary = raw_summary.split('<')[0] if '<' in raw_summary else raw_summary
-                    if len(clean_summary) > 10:
-                        message += f"📝 {clean_summary}\n\n"
+                if full_details:
+                    message += f"📄 {full_details}\n\n"
+                else:
+                    message += f"📌 تفاصيل عاجلة ومتابعة حصرية لقاء أحداث المباراة والفعاليات الرياضية لحظة بلحظة.\n\n"
                 
-                message += f"📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                message += f"📍 **المصدر:** {source_name}"
                 
                 send_telegram_message(message)
                 
