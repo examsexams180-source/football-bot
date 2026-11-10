@@ -3,6 +3,7 @@ import requests
 import feedparser
 import sys
 import json
+from html.parser import HTMLParser
 
 # بيانات التيليجرام الخاصة بك
 TELEGRAM_BOT_TOKEN = "9113301542:AAGAltyA38C8YTJWeFPf1PtnuVY40PaC0cE"
@@ -24,46 +25,51 @@ def save_sent_news(sent_list):
     try:
         with open(SENT_NEWS_FILE, "w", encoding="utf-8") as f:
             json.dump(sent_list[-400:], f)
-    except Exception as e:
-        print(f"Error saving sent news: {e}")
+    except:
+        pass
 
-# مصادر Google News RSS شاملة لكل أخبار الكرة
+class HTMLTextExtractor(HTMLParser):
+    """أداة نظيفة لإزالة أكواد HTML والحصول على النص الحقيقي فقط بدون تأليف"""
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.text = []
+
+    def handle_data(self, d):
+        self.text.append(d)
+
+    def get_data(self):
+        return ''.join(self.text).strip()
+
+def clean_html(raw_html):
+    if not raw_html:
+        return ""
+    try:
+        parser = HTMLTextExtractor()
+        parser.feed(raw_html)
+        return parser.get_data()
+    except:
+        return raw_html.split('<')[0].strip()
+
+# مصادر Google News RSS المتقدمة (تستخرج الأخبار مع ملخصاتها الحقيقية من كبرى المواقع)
 GOOGLE_NEWS_FEEDS = [
     {
-        "name": "أخبار كرة القدم العامة", 
+        "name": "أخبار كرة القدم العالمية والمحلية",
         "url": "https://news.google.com/rss/search?q=%D9%83%D8%B1%D8%A9+%D9%82%D8%AF%D9%85&hl=ar&gl=EG&ceid=EG:ar"
     },
     {
-        "name": "موقع بطولات - Btolat", 
-        "url": "https://news.google.com/rss/search?q=site:btolat.com&hl=ar&gl=EG&ceid=EG:ar"
+        "name": "موقع بطولات - Btolat",
+        "url": "https://news.google.com/rss/search?q=site:btolat.com+%D9%83%D8%B1%D8%A9+%D9%82%D8%AF%D9%85&hl=ar&gl=EG&ceid=EG:ar"
     },
     {
-        "name": "موقع يلا كورة - YallaKora", 
-        "url": "https://news.google.com/rss/search?q=site:yallakora.com&hl=ar&gl=EG&ceid=EG:ar"
+        "name": "موقع يلا كورة - YallaKora",
+        "url": "https://news.google.com/rss/search?q=site:yallakora.com+%D9%83%D8%B1%D8%A9+%D9%82%D8%AF%D9%85&hl=ar&gl=EG&ceid=EG:ar"
+    },
+    {
+        "name": "الدوري المصري والبطولات العربية",
+        "url": "https://news.google.com/rss/search?q=%D8%A7%D9%84%D8%AF%D9%88%D8%B1%D9%8A+%D8%A7%D9%84%D9%85%D8%B5%D8%B1%D9%8A+OR+%D8%A7%D9%84%D8%B2%D9%85%D8%A7%D9%84%D9%83+OR+%D8%A7%D9%84%D8%A3%D9%87%D目前的+OR+%D8%A7%D9%84%D8%A3%D9%87%D9%84%D9%8A&hl=ar&gl=EG&ceid=EG:ar"
     }
 ]
-
-def fetch_article_summary(url):
-    """دالة لجلب تفاصيل الخبر من الرابط الأصلي مع حماية كاملة من أي خطأ"""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        response = requests.get(url, headers=headers, timeout=8)
-        if response.status_code == 200:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
-            paragraphs = soup.find_all('p')
-            article_text = ""
-            for p in paragraphs:
-                text = p.get_text().strip()
-                if len(text) > 25 and "حقوق" not in text and "محفوظة" not in text:
-                    article_text += text + "\n\n"
-                    if len(article_text) > 450:  # اكتفاء بأول 450 حرف لخبر مكثف وجميل
-                        break
-            if len(article_text) > 40:
-                return article_text.strip()
-    except Exception as e:
-        print(f"Scraping info warning: {e}")
-    return None
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -71,25 +77,25 @@ def send_telegram_message(message):
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "Markdown",
-        "disable_web_page_preview": True  # إلغاء الصور والمعاينة نهائياً لتصل الرسالة نصية فقط
+        "disable_web_page_preview": True  # إلغاء معاينة الصور والروابط تماماً
     }
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
-            print("Message sent successfully to Telegram!")
+            print("Google News article sent successfully!")
         else:
             print(f"Failed to send message: {response.text}")
     except Exception as e:
         print(f"Error sending message: {e}")
 
 def main():
-    print("Google News Full-Content Football Bot started...")
+    print("Google News Football Bot started...")
     try:
         sent_news = load_sent_news()
         articles_sent_count = 0
         
         for feed_info in GOOGLE_NEWS_FEEDS:
-            if articles_sent_count >= 2: # إرسال خبرين في كل دورة تشغيل
+            if articles_sent_count >= 2: # إرسال خبرين في كل دورة تشغيل لضمان استمرارية التحديث
                 break
                 
             source_name = feed_info["name"]
@@ -102,32 +108,29 @@ def main():
                 if not feed.entries:
                     continue
                 
-                for entry in feed.entries[:8]:
+                for entry in feed.entries[:10]:
                     link = getattr(entry, 'link', '')
                     if not link or link in sent_news:
                         continue
                     
-                    raw_title = getattr(entry, 'title', 'خبر رياضي جديد')
-                    print(f"Found article: {raw_title}")
+                    title = getattr(entry, 'title', '').strip()
+                    if not title:
+                        continue
                     
-                    # جلب تفاصيل الخبر من الموقع الأصلي
-                    details = fetch_article_summary(link)
+                    # استخراج الملخص الحقيقي من وصف جوجل نيوز
+                    raw_summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
+                    clean_summary = clean_html(raw_summary)
                     
-                    # بناء رسالة متكاملة وغنية
-                    message = f"⚽ **{raw_title}**\n\n"
+                    # بناء رسالة متكاملة وغنية بالتفاصيل الحقيقية
+                    message = f"⚽ **{title}**\n\n"
                     
-                    if details:
-                        message += f"📄 {details}\n"
-                    else:
-                        # لو لم يتوفر نص الموقع، نأخذ ملخص الـ RSS إن وجد
-                        raw_summary = getattr(entry, 'summary', '')
-                        if raw_summary and len(raw_summary) > 15:
-                            clean_summary = raw_summary.split('<')[0]
-                            message += f"📝 {clean_summary}\n"
-                        else:
-                            message += f"📌 تابع تفاصيل الخبر الرياضي لحظة بلحظة عبر الرابط أدناه.\n"
+                    # إذا جلبنا ملخصاً حقيقياً وواضحاً من جوجل، نضيفه للرسالة
+                    if clean_summary and len(clean_summary) > 30 and clean_summary != title:
+                        if len(clean_summary) > 400:
+                            clean_summary = clean_summary[:400] + "..."
+                        message += f"📝 {clean_summary}\n\n"
                     
-                    message += f"\n📍 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
+                    message += f"📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
                     
                     send_telegram_message(message)
                     
@@ -138,11 +141,10 @@ def main():
                 print(f"Error parsing feed {source_name}: {e}")
                 
         save_sent_news(sent_news)
-        print(f"Task completed successfully. Total articles sent: {articles_sent_count}")
+        print(f"Task completed. Total articles sent: {articles_sent_count}")
     except Exception as e:
-        print(f"Critical execution error: {e}")
+        print(f"Critical error: {e}")
     
-    # إنهاء التشغيل بكود 0 لضمان عدم فشل الـ Workflow أبداً
     sys.exit(0)
 
 if __name__ == "__main__":
