@@ -1,9 +1,9 @@
-name: Run Telegram News Bot 24/7
+name: Run Telegram AI News Bot
 
 on:
   schedule:
-    - cron: '*/2 * * * *'  # هذا المنبه سيشغل البوت تلقائياً في الخلفية كل دقيقتين!
-  workflow_dispatch:     # يتيح لك أيضاً إمكانية تشغيله يدوياً متى شئت
+    - cron: '*/5 * * * *'  # الفحص كل 5 دقائق
+  workflow_dispatch:     # تشغيل يدوي متى شئت
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests feedparser beautifulsoup4
+        pip install requests feedparser beautifulsoup4 google-generativeai
 
     - name: Run Bot
       run: |
