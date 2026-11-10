@@ -71,14 +71,13 @@ NEWS_FEEDS = [
     }
 ]
 
-def generate_ai_news_details(title, original_summary):
+def generate_ai_news_details(title):
     """استخدام Gemini API لصياغة خبر رياضي متكامل ووافي بدون تأليف وهمي"""
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
 أنت محرر رياضي محترف وكبير في وكالة أنباء رياضية كبرى.
 العنوان الحقيقي للخبر: "{title}"
-ملخص المصدر المبدئي: "{original_summary}"
 
 المطلوب:
 اكتب فقرة إخبارية متكاملة، احترافية، ومنسقة باللغة العربية الفصحى تشرح تفاصيل هذا الخبر الرياضي وتضع خلفية تحليلية مبسطة عنه للقارئ، بشرط عدم تأليف أي أحداث غير صحيحة أو خارج سياق العنوان تماماً. اجعل النص في حدود 3 إلى 4 أسطر مكثفة وممتعة ومناسبة للنشر الفوري على قناة تيليجرام. لا تكرر العنوان بالحرف بل ابدأ في صياغة التفاصيل مباشرة.
@@ -136,20 +135,16 @@ def main():
                     if not title:
                         continue
                     
-                    raw_summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
-                    clean_summary = clean_html(raw_summary)
-                    
                     # استدعاء جيميناي لصياغة خبر تفصيلي متكامل ومحترف
                     print(f"Generating AI details for: {title}")
-                    ai_details = generate_ai_news_details(title, clean_summary)
+                    ai_details = generate_ai_news_details(title)
                     
-                    # بناء الرسالة النهائية المتكاملة
+                    # بناء الرسالة النهائية المتكاملة (بدون أي تكرار نهائياً)
                     message = f"⚽ **{title}**\n\n"
                     
-                    if ai_details:
+                    # نضع تفاصيل جيميناي فقط لو تم توليدها بنجاح وتختلف عن العنوان
+                    if ai_details and ai_details.strip() != title.strip():
                         message += f"📝 {ai_details}\n\n"
-                    elif clean_summary and len(clean_summary) > 30:
-                        message += f"📝 {clean_summary}\n\n"
                         
                     message += f"📌 **المصدر:** {source_name}\n🔗 [اقرأ التفاصيل من هنا]({link})"
                     
