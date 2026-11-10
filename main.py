@@ -55,7 +55,7 @@ def clean_html(raw_html):
     except:
         return raw_html.split('<')[0].strip()
 
-# مصادر الأخبار الرياضية العربية عبر Google News RSS لالتقاط أحدث العناوين فور نزولها
+# مصادر الأخبار الرياضية العربية عبر Google News RSS
 NEWS_FEEDS = [
     {
         "name": "موقع بطولات - Btolat",
@@ -71,29 +71,27 @@ NEWS_FEEDS = [
     }
 ]
 
-def generate_ai_news_details(title):
-    """جعل جيميناي يبحث بنفسه على شبكة الإنترنت ويستخلص تفاصيل الخبر بالكامل"""
+def generate_ai_news_details(title, original_summary):
+    """صياغة خبر رياضي متكامل ووافي باستخدام قدرات تحليل وتلخيص جيميناي الخارقة"""
     try:
-        # تفعيل أداة البحث المباشر لجيميناي (Google Search Grounding)
-        model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
-            tools=[{"google_search": {}}]
-        )
-        
+        model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"""
-أنت محرر رياضي محترف. بناءً على هذا العنوان الإخباري: "{title}"
-قم بالبحث في الإنترنت عن تفاصيل هذا الخبر الحقيقية، ثم اكتب فقرة إخبارية متكاملة، احترافية، وواضحة باللغة العربية الفصحى تشرح تفاصيل الخبر والملابسات المحيطة به.
-الشروط الصارمة:
-1. ممنوع تماماً تأليف أي أحداث وهمية أو غير حقيقية.
-2. اعتمد على الحقائق الرياضية الدقيقة من نتائج البحث.
-3. اجعل النص في حدود 3 إلى 4 أسطر مكثفة وممتعة للقارئ على تيليجرام.
-4. لا تكرر العنوان بالحرف بل ادخل في التفاصيل مباشرة.
+أنت محرر رياضي محترف وكبير في وكالة أنباء كبرى.
+العنوان الحقيقي للخبر: "{title}"
+النبذة أو المقتطف المبدئي من المصدر: "{original_summary}"
+
+المطلوب:
+بناءً على المعطيات أعلاه، اكتب فقرة إخبارية متكاملة، احترافية، ومنسقة باللغة العربية الفصحى تشرح تفاصيل هذا الخبر الرياضي وتعطي خلفية تحليلية مبسطة عنه للقارئ.
+شروط صارمة:
+1. ممنوع تماماً تأليف أحداث وهمية أو خارج سياق الخبر.
+2. اجعل النص في حدود 3 إلى 4 أسطر مكثفة وممتعة ومناسبة للنشر الفوري على تيليجرام.
+3. لا تكرر العنوان بالحرف، بل ابدأ في صياغة التفاصيل والتحليل مباشرة بأسلوب شيق.
 """
         response = model.generate_content(prompt)
         if response and response.text:
             return response.text.strip()
     except Exception as e:
-        print(f"Gemini Search & API Error: {e}")
+        print(f"Gemini API Error: {e}")
     return None
 
 def send_telegram_message(message):
@@ -107,20 +105,20 @@ def send_telegram_message(message):
     try:
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
-            print("Full AI-searched news sent successfully to Telegram!")
+            print("AI-powered detailed news sent successfully to Telegram!")
         else:
             print(f"Failed to send message: {response.text}")
     except Exception as e:
         print(f"Error sending message: {e}")
 
 def main():
-    print("Full AI Search Football Bot started...")
+    print("Stable AI Football News Bot started...")
     try:
         sent_news = load_sent_news()
         articles_sent_count = 0
         
         for feed_info in NEWS_FEEDS:
-            if articles_sent_count >= 2: # إرسال خبرين مفصلين بالكامل في كل دورة
+            if articles_sent_count >= 2: # إرسال خبرين مفصلين في كل دورة
                 break
                 
             source_name = feed_info["name"]
@@ -142,9 +140,12 @@ def main():
                     if not title:
                         continue
                     
-                    # جيميناي يبحث الآن بنفسه على الإنترنت ويجلب التفاصيل الكاملة
-                    print(f"Gemini is searching and summarizing for: {title}")
-                    ai_details = generate_ai_news_details(title)
+                    raw_summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
+                    clean_summary = clean_html(raw_summary)
+                    
+                    # استدعاء جيميناي لصياغة الخبر بالتفاصيل الكاملة
+                    print(f"Generating rich AI details for: {title}")
+                    ai_details = generate_ai_news_details(title, clean_summary)
                     
                     # بناء الرسالة النهائية المتكاملة
                     message = f"⚽ **{title}**\n\n"
@@ -163,7 +164,7 @@ def main():
                 print(f"Error parsing feed {source_name}: {e}")
                 
         save_sent_news(sent_news)
-        print(f"Task completed. Total AI searched articles sent: {articles_sent_count}")
+        print(f"Task completed. Total AI detailed articles sent: {articles_sent_count}")
     except Exception as e:
         print(f"Critical error: {e}")
     
