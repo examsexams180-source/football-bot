@@ -2,15 +2,16 @@ name: Run Telegram News Bot 24/7
 
 on:
   schedule:
-    - cron: '*/2 * * * *'  # تشغيل تلقائي كل دقيقتين
-  workflow_dispatch:
+    - cron: '*/2 * * * *'  # هذا المنبه سيشغل البوت تلقائياً في الخلفية كل دقيقتين!
+  workflow_dispatch:     # يتيح لك أيضاً إمكانية تشغيله يدوياً متى شئت
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -20,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests feedparser
+        pip install requests feedparser beautifulsoup4
 
     - name: Run Bot
       run: |
